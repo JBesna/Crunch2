@@ -15,7 +15,7 @@ token_secret <- "5Y5TRhFfrLWjNDCWv3b4XeWhiQixzvqT79LnvvWGVHUyL" #in the quotes, 
 setup_twitter_oauth(api_key, api_secret, token, token_secret)
 
 # tweets
-tweets <- searchTwitter('JP+Morgan', n = 200, lang = "en")
+tweets <- searchTwitter('Goldman Sachs', n = 6500, lang = "en")
 #strip retweets
 strip_retweets(tweets)
 
@@ -26,10 +26,13 @@ df1 <- readRDS("tweets.rds")
 df1 <- df1[df1$isRetweet==FALSE,]
 
 #remove duplicate tweets from the data frame using #dplyr::distinct
-dplyr::distinct(df1)
+df1 <- dplyr::distinct(df1)
 
+# convert to lower case
+df1$text <- str_to_lower(df1$text, locale = "en")
 # clean data
 unclean_tweet <- df1$text
+
 clean_tweet = gsub("&amp", "", unclean_tweet)
 clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
 clean_tweet = gsub("@\\w+", "", clean_tweet)
@@ -38,7 +41,6 @@ clean_tweet = gsub("[[:digit:]]", "", clean_tweet)
 clean_tweet = gsub("http\\w+", "", clean_tweet)
 clean_tweet = gsub("[ \t]{2,}", "", clean_tweet)
 clean_tweet = gsub("^\\s+|\\s+$", "", clean_tweet) 
-
 
 # additional cleaning
 #get rid of unnecessary spaces
@@ -50,22 +52,35 @@ clean_tweet <- removeURL(clean_tweet)
 # Take out retweet header, there is only one
 clean_tweet <- str_replace(clean_tweet,"RT @[a-z,A-Z]*: ","")
 # Get rid of hashtags
+hashtags <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
 clean_tweet <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
 # Get rid of references to other screennames
 clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","")  
 
+firm_name <- "goldman"
+# replace "soldman sachs" with "goldman"
+clean_tweet <- gsub("goldman sachs", firm_name, clean_tweet)
+
+
+
 df1$clean_text <- clean_tweet
+df1$firm <- firm_name
 # reorder column
 
-refcols <- c("text","clean_text")
+# filter for rows that contain "JPMorgan" to remove instances of "Morgan" only
+df1 <- dplyr::filter(df1, grepl('goldman', clean_text))
+
+refcols <- c("firm","text","clean_text")
 df1 <- df1[, c(refcols, setdiff(names(df1), refcols))]
 names(df1)
 
+
+cleaned <- df1[!duplicated(df1$clean_text), ]
+
 # write output
-write.csv(df1, "/Users/johnmara/tweets.csv")
-winner <-df1 %>% select(text,retweetCount,screenName,id )%>% filter(retweetCount == max(retweetCount))
-View(winner)
-head(df1)
+#write.csv(df1, "/Users/johnmara/tweets.csv")
+write.csv(cleaned, "/Users/johnmara/tweets_gs.csv")
+
 # Part 2 - Geolocations
                             
 # mapping code  
