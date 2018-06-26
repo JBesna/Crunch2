@@ -2,8 +2,10 @@
 
 install.packages("twitteR") 
 install.package("dplyr")
+install.packages("stringr")
 library (twitteR)
 library(dplyr)
+library(stringr)
 
 api_key <- "bjNHw9ZB2W7TL5GZpAXBiEYGA" #in the quotes, put your API key 
 api_secret <- "rkzmLcl4l75tQjQcuNiqFUNDWfw9R4mgqemvXTu7LAADcYR4Lg" #in the quotes, put your API secret token 
@@ -13,7 +15,7 @@ token_secret <- "5Y5TRhFfrLWjNDCWv3b4XeWhiQixzvqT79LnvvWGVHUyL" #in the quotes, 
 setup_twitter_oauth(api_key, api_secret, token, token_secret)
 
 # tweets
-tweets <- searchTwitter("JP Morgan OR #JPMorgan OR @JPMorgan", n = 200, lang = "en")
+tweets <- searchTwitter('JP+Morgan', n = 200, lang = "en")
 #strip retweets
 strip_retweets(tweets)
 
@@ -21,14 +23,49 @@ strip_retweets(tweets)
 df <- twListToDF(tweets) #extract the data frame save it locally
 saveRDS(df, file="tweets.rds")
 df1 <- readRDS("tweets.rds")
+df1 <- df1[df1$isRetweet==FALSE,]
 
-
-#clean up any duplicate tweets from the data frame using #dplyr::distinct
+#remove duplicate tweets from the data frame using #dplyr::distinct
 dplyr::distinct(df1)
 
+# clean data
+unclean_tweet <- df1$text
+clean_tweet = gsub("&amp", "", unclean_tweet)
+clean_tweet = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", clean_tweet)
+clean_tweet = gsub("@\\w+", "", clean_tweet)
+clean_tweet = gsub("[[:punct:]]", "", clean_tweet)
+clean_tweet = gsub("[[:digit:]]", "", clean_tweet)
+clean_tweet = gsub("http\\w+", "", clean_tweet)
+clean_tweet = gsub("[ \t]{2,}", "", clean_tweet)
+clean_tweet = gsub("^\\s+|\\s+$", "", clean_tweet) 
+
+
+# additional cleaning
+#get rid of unnecessary spaces
+clean_tweet <- str_replace_all(clean_tweet," "," ")
+# Get rid of URLs
+removeURL <- function(x) gsub("http[^[:space:]]*", "", x)
+clean_tweet <- removeURL(clean_tweet)
+#clean_tweet <- str_replace_all(clean_tweet, "http://t.co/[a-z,A-Z,0-9]*{8}","")
+# Take out retweet header, there is only one
+clean_tweet <- str_replace(clean_tweet,"RT @[a-z,A-Z]*: ","")
+# Get rid of hashtags
+clean_tweet <- str_replace_all(clean_tweet,"#[a-z,A-Z]*","")
+# Get rid of references to other screennames
+clean_tweet <- str_replace_all(clean_tweet,"@[a-z,A-Z]*","")  
+
+df1$clean_text <- clean_tweet
+# reorder column
+
+refcols <- c("text","clean_text")
+df1 <- df1[, c(refcols, setdiff(names(df1), refcols))]
+names(df1)
+
+# write output
+write.csv(df1, "/Users/johnmara/tweets.csv")
 winner <-df1 %>% select(text,retweetCount,screenName,id )%>% filter(retweetCount == max(retweetCount))
 View(winner)
-
+head(df1)
 # Part 2 - Geolocations
                             
 # mapping code  
